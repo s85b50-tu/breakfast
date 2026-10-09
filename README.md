@@ -1,2 +1,6 @@
-# breakfast
-breakfast application development
+# 아침식사 루틴
+
+독일식 아침 구성, 재고, 구매 기록, 월 식비를 관리하는 개인용 PWA.
+데이터는 브라우저(localStorage)에만 저장되며, 앱 안의 백업 기능으로 내보내고 불러올 수 있습니다.
+
+주의: 백업 JSON 파일을 이 저장소에 커밋하지 마세요.
