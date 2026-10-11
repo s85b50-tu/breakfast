@@ -137,10 +137,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
 <section class="tab" id="tab-info">
 <h2>보관과 손질</h2>
-<h3>빵 (저당 리얼 통밀빵 700g)</h3>
-<ul><li>사 온 뒤 3일은 생으로 먹는다.</li><li>3일째 남은 빵은 바로 냉동하고, 먹을 때 버터나 엑스트라버진 올리브유를 발라 굽는다.</li></ul>
-<h3>베이컨 (오스카마이어 453g)</h3>
-<ul><li>한 번 먹을 만큼 나눠서 냉동한다.</li><li>삼겹살 함량 높은 해외산을 유지한다. 국내 잡육 베이컨은 만족도가 떨어졌다.</li></ul>
+<h3>빵 (깜빠뉴)</h3>
+<ul><li>통으로 두고 먹을 때마다 그날 필요한 만큼만 썬다.</li><li>버터나 엑스트라버진 올리브유를 발라 굽는다.</li></ul>
+<h3>베이컨</h3>
+<ul><li>한 번 먹을 만큼 나눠서 냉동한다.</li><li>삼겹살 함량 높은 해외산을 기준으로 여러 곳을 주문해 보며 맞는 브랜드를 찾는 중. 국내 잡육 베이컨은 만족도가 떨어졌다.</li></ul>
 <h3>연어 · 닭 통다리 · 부어스트</h3>
 <ul><li>냉동해두고, 먹기 전날 밤 냉장실로 옮겨 해동한다.</li></ul>
 <h3>절임류 (자우어크라우트, 카스텔베트라노 올리브)</h3>
@@ -149,7 +149,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <h2>재주문 기준</h2>
 <ul>
   <li>절임류 · 커리케첩 · 버터 · 올리브유: 절반 남으면</li>
-  <li>빵: 냉동분 포함 2~3조각 남으면</li>
+  <li>빵(깜빠뉴): 남은 양을 보고 직접 체크</li>
   <li>고기류: 종류별 소분 1~2팩 남으면</li>
 </ul>
 
@@ -194,14 +194,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 (function(){
 var KEY = 'breakfast-v2';
 var PLATE = [
-  ['빵', [['호밀빵'],['통밀빵'],['1조각, 구워서',1]], ['통밀빵 / 호밀빵']],
+  ['빵', [['깜빠뉴','깜빠뉴'],['그날 썰어서, 구워서',1]]],
   ['고기', [['훈제베이컨','베이컨'],['닭 통다리구이','닭 통다리'],['연어스테이크','연어'],['부어스트','부어스트']]],
   ['계란', [['프라이 2개','계란'],['스크램블 (버터+올리브유)','계란'],['양배추 계란전','양배추']]],
   ['절임', [['자우어크라우트',0,1],['그린올리브',0,1]]],
   ['음료', [['우유','우유'],['콜라','콜라'],['탄산수','탄산수']]]
 ];
 var SEED = {budget:0, log:[], items:[
-  {id:'i1',name:'통밀빵 / 호밀빵',where:'실온 → 냉동',amt:'0',need:true},
+  {id:'i1',name:'깜빠뉴',where:'통으로 보관, 그날 썰기',amt:'0',need:true},
   {id:'i2',name:'베이컨',where:'냉동',amt:'0장',need:true},
   {id:'i3',name:'닭 통다리',where:'냉동',amt:'0',need:true},
   {id:'i4',name:'연어',where:'냉동',amt:'0',need:true},
@@ -222,6 +222,8 @@ var state;
 try { state = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch(e){}
 if (!state || !state.items) state = JSON.parse(JSON.stringify(SEED));
 state.log = state.log || []; state.budget = state.budget || 0;
+state.items.forEach(function(i){ if (i.id === 'i1' && i.name === '통밀빵 / 호밀빵') { i.name = '깜빠뉴'; if (i.where === '실온 → 냉동') i.where = '통으로 보관, 그날 썰기'; } });
+state.log.forEach(function(e){ if (e.name === '통밀빵 / 호밀빵') e.name = '깜빠뉴'; });
 var editing = false, buying = null;
 
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); $('status').textContent = '자동 저장됨'; }
