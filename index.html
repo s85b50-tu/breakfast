@@ -87,6 +87,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .tabbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tabbar button[aria-current="page"]{color:var(--olive);font-weight:700}
 .tabbar button[aria-current="page"] svg{stroke-width:2.1}
+.badge.dotb{min-width:9px;width:9px;height:9px;padding:0;top:7px;left:calc(50% + 9px)}
 .badge{position:absolute;top:4px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--mustard);color:#fff;font-style:normal;font-size:.68rem;font-weight:700;line-height:17px;text-align:center}
 .toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));transform:translateX(-50%);
   background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -131,16 +132,24 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 </section>
 
 <section class="tab" id="tab-money">
-<h2>이번 달 식비</h2>
+<h2>이번 달 아침 식비</h2>
 <div class="card">
-  <div class="sum"><div><b id="mSpent">0원</b><span>이번 달 지출</span></div><div><b id="mCount">0건</b><span>구매 횟수</span></div></div>
-  <div class="row" style="align-items:center"><label for="budget" class="hint">월 예산</label>
-    <input id="budget" type="number" inputmode="numeric" style="max-width:9em" placeholder="예: 150000"></div>
-  <div class="meter" aria-hidden="true"><i id="mBar" style="width:0"></i></div>
-  <div class="hint" id="mMsg"></div>
-  <ul class="log" id="log"></ul>
+  <div class="sum"><div><b id="fMonth">0원</b><span>이번 달 아침 식비</span></div><div><b id="fCount">0회</b><span>장 본 날</span></div></div>
+  <p class="hint" id="fGap"></p>
+  <p class="hint" id="fSync"></p>
+  <ul class="log" id="fList"></ul>
 </div>
-
+<h2>컨디션 앱에서 받기</h2>
+<div class="card">
+  <p class="hint">금액은 컨디션 앱의 기록이 기준입니다. 여기서는 받아서 보여주기만 합니다. 일주일에 한 번쯤 가져오세요.</p>
+  <textarea id="feedText" rows="4" placeholder="컨디션 앱 데이터(JSON) 또는 줄마다: 2026-10-08,17070"></textarea>
+  <div class="row" style="margin-top:8px">
+    <button class="btn" id="feedGo" type="button">붙여넣은 내용 가져오기</button>
+    <button class="btn ghost" id="feedFile" type="button">파일 선택</button>
+    <input id="feedIn" type="file" accept=".json,.csv,.txt,application/json,text/plain" hidden>
+  </div>
+  <p class="hint">읽는 형식: 컨디션 앱 저장 데이터의 <code>records</code>, 또는 <code>날짜,아침식재료[,총지출]</code> 줄. 같은 날짜는 새 값으로 덮어씁니다.</p>
+</div>
 </section>
 
 <section class="tab" id="tab-info">
@@ -184,14 +193,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <nav class="tabbar" id="tabbar" aria-label="메뉴">
   <button type="button" data-tab="today"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="3.5"/><path d="M3 5v6M5 5v6M3 8h2M4 11v8M21 5c-1.4 1.2-2 3-2 6h2v8"/></svg><span>오늘</span><i class="badge" id="badge" hidden></i></button>
   <button type="button" data-tab="stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10"/></svg><span>재고</span></button>
-  <button type="button" data-tab="money"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg><span>식비</span></button>
+  <button type="button" data-tab="money"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg><span>식비</span><i class="badge dotb" id="badgeFeed" hidden></i></button>
   <button type="button" data-tab="info"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>정보</span></button>
 </nav>
 
 <dialog id="buyDlg">
   <p><b id="buyName"></b> 샀음</p>
-  <label class="hint" for="buyPrice">가격 (선택)</label>
-  <input id="buyPrice" type="number" inputmode="numeric" placeholder="원">
   <div id="buyAmtBox" hidden style="margin-top:10px"><label class="hint" for="buyAmt">지금 남은 양 (갱신)</label>
   <input id="buyAmt" type="text" placeholder="예: 6장"></div>
   <div class="row" style="margin-top:12px">
@@ -212,7 +219,7 @@ var PLATE = [
   ['절임', [['자우어크라우트',0,1],['그린올리브',0,1]]],
   ['음료', [['우유','우유'],['콜라','콜라'],['탄산수','탄산수']]]
 ];
-var SEED = {budget:0, log:[], items:[
+var SEED = {log:[], feed:{syncedAt:null, days:{}}, items:[
   {id:'i1',name:'깜빠뉴',where:'통으로 보관, 그날 썰기',amt:'0',need:true,mode:'cycle',limit:10},
   {id:'i2',name:'베이컨',where:'냉동',amt:'0장',need:false,mode:'qty',limit:4},
   {id:'i3',name:'닭 통다리',where:'냉동',amt:'0',need:true},
@@ -233,7 +240,8 @@ var $ = function(id){ return document.getElementById(id); };
 var state;
 try { state = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch(e){}
 if (!state || !state.items) state = JSON.parse(JSON.stringify(SEED));
-state.log = state.log || []; state.budget = state.budget || 0;
+state.log = state.log || [];
+state.feed = state.feed || {syncedAt: null, days: {}};
 function migrate(){
 state.items.forEach(function(i){ if (i.id === 'i1' && i.name === '통밀빵 / 호밀빵') { i.name = '깜빠뉴'; if (i.where === '실온 → 냉동') i.where = '통으로 보관, 그날 썰기'; } });
 state.log.forEach(function(e){ if (e.name === '통밀빵 / 호밀빵') e.name = '깜빠뉴'; });
@@ -299,10 +307,10 @@ function renderShop(){
     var lb = lastBuy(item.name), why = autoReason(item), lab = why || (lb ? daysAgo(lb.date) + '일 전 구매' : '');
     if (lab) { var s = document.createElement('small'); s.textContent = lab; b.appendChild(s); }
     b.addEventListener('click', function(){
-      buying = item; $('buyName').textContent = item.name; $('buyPrice').value = '';
+      buying = item; $('buyName').textContent = item.name;
       $('buyAmtBox').hidden = item.mode !== 'qty'; $('buyAmt').value = item.amt || '';
       $('buySnooze').hidden = !isSuggest(item);
-      $('buyDlg').showModal(); $('buyPrice').focus();
+      $('buyDlg').showModal();
     });
     box.appendChild(b);
   });
@@ -315,7 +323,7 @@ function renderList(){
     var name = document.createElement('div'); name.className = 'name'; name.textContent = item.name;
     if (item.where) { var w = document.createElement('span'); w.className = 'where'; w.textContent = item.where; name.appendChild(w); }
     var lb = lastBuy(item.name);
-    if (lb) { var l = document.createElement('span'); l.className = 'last'; l.textContent = '마지막 구매 ' + daysAgo(lb.date) + '일 전' + (lb.price ? ' · ' + won(lb.price) : ''); name.appendChild(l); }
+    if (lb) { var l = document.createElement('span'); l.className = 'last'; l.textContent = '마지막 구매 ' + daysAgo(lb.date) + '일 전'; name.appendChild(l); }
     var why = autoReason(item);
     if (why) { var wy = document.createElement('span'); wy.className = 'why'; wy.textContent = (isSuggest(item) ? '제안: ' : '자동: ') + why; name.appendChild(wy); }
     var amt = document.createElement('input'); amt.type = 'text'; amt.value = item.amt; amt.placeholder = '남은 양';
@@ -343,31 +351,64 @@ function renderList(){
   });
 }
 
-function renderMonth(){
-  var m = today().slice(0, 7);
-  var logs = state.log.filter(function(e){ return e.date.slice(0, 7) === m; });
-  var spent = logs.reduce(function(a, e){ return a + (e.price || 0); }, 0);
-  $('mSpent').textContent = won(spent); $('mCount').textContent = logs.length + '건';
-  $('budget').value = state.budget || '';
-  var bar = $('mBar'), pct = state.budget ? Math.min(100, spent / state.budget * 100) : 0;
-  bar.style.width = pct + '%'; bar.className = state.budget && spent > state.budget ? 'over' : '';
-  $('mMsg').textContent = !state.budget ? '월 예산을 입력하면 남은 금액을 보여줍니다.'
-    : spent > state.budget ? '예산을 ' + won(spent - state.budget) + ' 넘었어요. 비싼 품목의 구매 주기를 늘려보세요.'
-    : '예산까지 ' + won(state.budget - spent) + ' 남았어요.';
-  var ul = $('log'); ul.textContent = '';
-  state.log.slice(-8).reverse().forEach(function(e){
+function feedDays(){ return state.feed && state.feed.days ? state.feed.days : {}; }
+function renderFeed(){
+  var days = feedDays(), keys = Object.keys(days).sort(), m = today().slice(0, 7);
+  var month = 0, shop = [];
+  keys.forEach(function(k){ var f = days[k].food; if (typeof f === 'number' && f > 0) { shop.push(k); if (k.slice(0, 7) === m) month += f; } });
+  var cnt = shop.filter(function(k){ return k.slice(0, 7) === m; }).length;
+  $('fMonth').textContent = won(month); $('fCount').textContent = cnt + '회';
+  var gap = '';
+  if (shop.length >= 2) { var sum = 0; for (var i = 1; i < shop.length; i++) sum += (new Date(shop[i]) - new Date(shop[i - 1])) / 86400000; gap = '장 보는 간격 평균 ' + (sum / (shop.length - 1)).toFixed(1) + '일 (' + shop.length + '회 기준)'; }
+  $('fGap').textContent = gap || '장 본 날이 2번 이상 쌓이면 평균 간격을 보여줘요.';
+  var sy = state.feed && state.feed.syncedAt, stale = !sy || daysAgo(sy) >= 7;
+  $('fSync').textContent = !sy ? '아직 컨디션 앱에서 가져온 적이 없어요.' : '마지막으로 가져온 날: ' + sy + ' (' + daysAgo(sy) + '일 전)' + (stale ? ' · 가져올 때가 됐어요' : '');
+  $('fSync').style.color = stale ? 'var(--mustard)' : '';
+  $('badgeFeed').hidden = !stale;
+  var ul = $('fList'); ul.textContent = '';
+  shop.slice(-8).reverse().forEach(function(k){
     var li = document.createElement('li');
-    var a = document.createElement('span'); a.textContent = e.date.slice(5).replace('-', '/') + ' ' + e.name;
-    var b = document.createElement('span'); b.textContent = e.price ? won(e.price) : '-';
+    var a = document.createElement('span'); a.textContent = k.slice(5).replace('-', '/');
+    var b = document.createElement('span'); b.textContent = won(days[k].food);
     li.appendChild(a); li.appendChild(b); ul.appendChild(li);
   });
 }
+function parseFeed(text){
+  var out = {}, t = String(text || '').trim();
+  function put(k, food, spend){
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
+    var f = typeof food === 'number' && !isNaN(food) ? food : null, sp = typeof spend === 'number' && !isNaN(spend) ? spend : null;
+    if (f === null && sp === null) return;
+    out[k] = {food: f, spend: sp};
+  }
+  if (t.charAt(0) === '{' || t.charAt(0) === '[') {
+    var d = JSON.parse(t), recs = d && d.records ? d.records : d;
+    if (Array.isArray(recs)) recs.forEach(function(r){ if (r) put(r.date, r.food, r.spend); });
+    else Object.keys(recs).forEach(function(k){ var r = recs[k]; if (r && typeof r === 'object') put(k, r.food, r.spend); });
+  } else {
+    t.split(/\r?\n/).forEach(function(line){
+      var c = line.split(/[,\t]/).map(function(x){ return x.trim(); });
+      if (c.length < 2) return;
+      var n = function(v){ var x = parseInt(String(v).replace(/[^0-9]/g, ''), 10); return isNaN(x) ? null : x; };
+      put(c[0], n(c[1]), c.length > 2 ? n(c[2]) : undefined);
+    });
+  }
+  return out;
+}
+function importFeed(text){
+  var got;
+  try { got = parseFeed(text); } catch(e){ toast('읽을 수 없는 형식이에요'); return; }
+  var ks = Object.keys(got);
+  if (!ks.length) { toast('가져올 날짜 데이터가 없어요'); return; }
+  state.feed = state.feed || {syncedAt: null, days: {}};
+  ks.forEach(function(k){ state.feed.days[k] = got[k]; });
+  state.feed.syncedAt = today(); save(); renderAll(); toast(ks.length + '일치를 가져왔어요');
+}
 
-function renderAll(){ renderPlate(); renderShop(); renderList(); renderMonth(); }
+function renderAll(){ renderPlate(); renderShop(); renderList(); renderFeed(); }
 
 $('buyOk').addEventListener('click', function(){
-  var p = parseInt($('buyPrice').value, 10);
-  state.log.push({date: today(), name: buying.name, price: isNaN(p) ? 0 : p});
+    state.log.push({date: today(), name: buying.name});
   if (buying.mode === 'qty') buying.amt = $('buyAmt').value.trim();
   buying.need = false; buying.snooze = null; $('buyDlg').close(); save(); renderAll(); toast(buying.name + ' 기록했어요');
 });
@@ -375,7 +416,9 @@ $('buySnooze').addEventListener('click', function(){
   buying.snooze = addDays(3); $('buyDlg').close(); save(); renderAll(); toast(buying.name + ' 3일 뒤에 다시 제안할게요');
 });
 $('buyCancel').addEventListener('click', function(){ $('buyDlg').close(); });
-$('budget').addEventListener('change', function(){ state.budget = parseInt($('budget').value, 10) || 0; save(); renderMonth(); });
+$('feedGo').addEventListener('click', function(){ importFeed($('feedText').value); if ($('feedText').value.trim()) $('feedText').value = ''; });
+$('feedFile').addEventListener('click', function(){ $('feedIn').click(); });
+$('feedIn').addEventListener('change', function(){ var f = this.files[0]; this.value = ''; if (!f) return; var r = new FileReader(); r.onload = function(){ importFeed(r.result); }; r.readAsText(f); });
 $('editBtn').addEventListener('click', function(){
   editing = !editing; $('tracker').classList.toggle('editing', editing);
   $('editBtn').textContent = editing ? '편집 끝' : '품목 편집';
@@ -400,7 +443,7 @@ $('importIn').addEventListener('change', function(){
       var d = JSON.parse(r.result);
       if (!d || !Array.isArray(d.items)) throw new Error('bad');
       if (!confirm('현재 기록을 백업 내용으로 바꿀까요?')) return;
-      state = d; state.log = state.log || []; state.budget = state.budget || 0; migrate(); save(); renderAll(); toast('불러왔어요');
+      state = d; state.log = state.log || []; state.feed = state.feed || {syncedAt: null, days: {}}; migrate(); save(); renderAll(); toast('불러왔어요');
     } catch(e){ toast('올바른 백업 파일이 아니에요'); }
   };
   r.readAsText(f);
