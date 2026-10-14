@@ -112,7 +112,7 @@ textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid v
 <h2>오늘의 아침식사</h2>
 <div class="plate" id="plate"></div>
 <p class="note" id="pickNote" hidden></p>
-<div class="row" style="margin-top:10px"><button class="btn" id="eatBtn" type="button">먹었어요</button></div>
+<div class="row" style="margin-top:10px"><button class="btn" id="eatBtn" type="button">오늘의 아침식사 저장</button></div>
 <p class="hint" id="pickPlan"></p>
 <div id="eaten"></div>
 <p class="hint">깜빠뉴는 그날 썰어서 구워 먹어요. 재고는 주기로만 관리하고 차감하지 않아요.</p>
@@ -365,7 +365,7 @@ function planText(){
   var picks = pickedOpts(), n = $('pickNote'), pl = $('pickPlan');
   var ex = excludedSlots(), exn = Object.keys(ex);
   n.hidden = !exn.length; n.textContent = exn.length ? '부어스트 먹는 날은 계란을 빼고 커리케첩을 곁들인다.' : '';
-  if (!picks.length) { pl.textContent = '메뉴를 고르고 "먹었어요"를 누르면 재고에서 빠져요.'; return; }
+  if (!picks.length) { pl.textContent = '메뉴를 고르고 "오늘의 아침식사 저장"을 누르면 재고에서 빠져요.'; return; }
   var plans = planUses(picks), ok = [], no = [];
   plans.forEach(function(r){
     if (r.status === 'ok' || r.status === 'short') ok.push(r.item + ' ' + fmtN(r.qty) + r.unit + (r.status === 'short' ? '(부족)' : ''));
@@ -378,7 +378,7 @@ function renderEaten(){
   var ms = state.meals.filter(function(m){ return m.date === today(); });
   ms.forEach(function(m, idx){
     var row = document.createElement('div'); row.className = 'eatrow';
-    var t = document.createElement('span'); t.textContent = '먹음: ' + m.picks.join(' · ');
+    var t = document.createElement('span'); t.textContent = '저장됨: ' + m.picks.join(' · ');
     row.appendChild(t);
     if (idx === ms.length - 1) { var u = document.createElement('button'); u.type = 'button'; u.textContent = '되돌리기'; u.addEventListener('click', undoMeal); row.appendChild(u); }
     box.appendChild(row);
@@ -398,7 +398,7 @@ function eat(){
   });
   state.meals.push({date: today(), picks: picks.map(function(x){ return x.opt.name; }), used: used});
   state.pick = {date: today(), names: []};
-  save(); renderAll(); toast('기록했어요' + (used.length ? ' · 재고에서 뺐어요' : ''));
+  save(); renderAll(); toast('오늘의 아침식사를 저장했어요' + (used.length ? ' · 재고에서 뺐어요' : ''));
 }
 function undoMeal(){
   var idx = -1; for (var i = state.meals.length - 1; i >= 0; i--) if (state.meals[i].date === today()) { idx = i; break; }
