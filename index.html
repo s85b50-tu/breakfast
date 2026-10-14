@@ -87,6 +87,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .tabbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tabbar button[aria-current="page"]{color:var(--olive);font-weight:700}
 .tabbar button[aria-current="page"] svg{stroke-width:2.1}
+.pk{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--olive-soft);color:var(--ink);border-radius:999px;padding:7px 13px;min-height:40px}
+.pk[aria-pressed="true"]{background:var(--olive);border-color:var(--olive);color:#fff;font-weight:700}
+.pk.out{opacity:.45;text-decoration:line-through}
+.slot.off{opacity:.45}
+.slot.off .hint{margin:0}
+.eatrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:.9rem}
+.eatrow button{font:inherit;font-size:.82rem;font-weight:700;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink)}
+textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 .badge.dotb{min-width:9px;width:9px;height:9px;padding:0;top:7px;left:calc(50% + 9px)}
 .badge{position:absolute;top:4px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--mustard);color:#fff;font-style:normal;font-size:.68rem;font-weight:700;line-height:17px;text-align:center}
 .toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));transform:translateX(-50%);
@@ -101,10 +109,13 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <p class="lede">독일식 아침. 다섯 칸을 그날 기분대로 채운다.</p>
 
 <section class="tab" id="tab-today">
-<h2>한 접시 구성</h2>
+<h2>오늘의 아침식사</h2>
 <div class="plate" id="plate"></div>
-<p class="note">부어스트 먹는 날은 계란을 빼고 커리케첩을 곁들인다.</p>
-<p class="hint">재고가 없는(재주문 표시된) 재료는 흐리게 보입니다.</p>
+<p class="note" id="pickNote" hidden></p>
+<div class="row" style="margin-top:10px"><button class="btn" id="eatBtn" type="button">먹었어요</button></div>
+<p class="hint" id="pickPlan"></p>
+<div id="eaten"></div>
+<p class="hint">깜빠뉴는 그날 썰어서 구워 먹어요. 재고는 주기로만 관리하고 차감하지 않아요.</p>
 
 <h2>살 것</h2>
 <div class="card">
@@ -178,6 +189,16 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <li>대용량으로 사서 소분 냉동해 단가를 낮춘다.</li>
 </ul>
 
+<h2>레시피</h2>
+<div class="card">
+  <p class="hint">한 줄에 하나: <code>칸 | 메뉴 | 재료 수량단위, 재료 수량단위 | 제외:칸</code>. 재료는 재고 품목 이름과 같아야 하고, 단위는 재고의 남은 양 단위(예: 8장)와 같아야 차감돼요.</p>
+  <textarea id="rcText" rows="12" spellcheck="false"></textarea>
+  <div class="row" style="margin-top:8px">
+    <button class="btn" id="rcSave" type="button">레시피 저장</button>
+    <button class="btn ghost" id="rcReset" type="button">기본값으로</button>
+  </div>
+</div>
+
 <h2>백업</h2>
 <div class="card">
   <p class="hint">기록은 이 폰의 브라우저에만 저장됩니다. 브라우저 데이터를 지우면 사라지니, 가끔 백업하세요.</p>
@@ -212,14 +233,24 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <script>
 (function(){
 var KEY = 'breakfast-v2';
-var PLATE = [
-  ['빵', [['깜빠뉴','깜빠뉴'],['그날 썰어서, 구워서',1]]],
-  ['고기', [['훈제베이컨','베이컨'],['닭 통다리구이','닭 통다리'],['연어스테이크','연어'],['부어스트','부어스트']]],
-  ['계란', [['프라이 2개','계란'],['스크램블 (버터+올리브유)','계란'],['양배추 계란전','양배추']]],
-  ['절임', [['자우어크라우트',0,1],['그린올리브',0,1]]],
-  ['음료', [['우유','우유'],['콜라','콜라'],['탄산수','탄산수']]]
+var DEFAULT_MENU = [
+  {slot:'빵', opts:[{name:'깜빠뉴', uses:[]}]},
+  {slot:'고기', opts:[
+    {name:'훈제베이컨', uses:[{item:'베이컨', qty:2, unit:'장'}]},
+    {name:'닭 통다리구이', uses:[{item:'닭 통다리', qty:1, unit:'개'}]},
+    {name:'연어스테이크', uses:[{item:'연어', qty:1, unit:'개'}]},
+    {name:'부어스트', uses:[{item:'부어스트', qty:3, unit:'개'}], excludes:['계란']}]},
+  {slot:'계란', opts:[
+    {name:'프라이 2개', uses:[{item:'계란', qty:2, unit:'개'}]},
+    {name:'스크램블', uses:[{item:'계란', qty:2, unit:'개'}, {item:'버터', qty:1, unit:'스푼'}]},
+    {name:'양배추 계란전', uses:[{item:'계란', qty:2, unit:'개'}, {item:'양배추', qty:1, unit:'그릇'}]}]},
+  {slot:'절임', opts:[{name:'자우어크라우트', uses:[]}, {name:'그린올리브', uses:[]}]},
+  {slot:'음료', opts:[
+    {name:'우유', uses:[{item:'우유', qty:1, unit:'컵'}]},
+    {name:'콜라', uses:[]},
+    {name:'탄산수', uses:[{item:'탄산수', qty:1, unit:'병'}]}]}
 ];
-var SEED = {log:[], feed:{syncedAt:null, days:{}}, items:[
+var SEED = {log:[], meals:[], menu:null, feed:{syncedAt:null, days:{}}, items:[
   {id:'i1',name:'깜빠뉴',where:'통으로 보관, 그날 썰기',amt:'0',need:true,mode:'cycle',limit:10},
   {id:'i2',name:'베이컨',where:'냉동',amt:'0장',need:false,mode:'qty',limit:4},
   {id:'i3',name:'닭 통다리',where:'냉동',amt:'0',need:true},
@@ -242,7 +273,9 @@ try { state = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch(e){}
 if (!state || !state.items) state = JSON.parse(JSON.stringify(SEED));
 state.log = state.log || [];
 state.feed = state.feed || {syncedAt: null, days: {}};
+function ensureMenu(){ if (!state.menu) state.menu = JSON.parse(JSON.stringify(DEFAULT_MENU)); state.meals = state.meals || []; }
 function migrate(){
+ensureMenu();
 state.items.forEach(function(i){ if (i.id === 'i1' && i.name === '통밀빵 / 호밀빵') { i.name = '깜빠뉴'; if (i.where === '실온 → 냉동') i.where = '통으로 보관, 그날 썰기'; } });
 state.log.forEach(function(e){ if (e.name === '통밀빵 / 호밀빵') e.name = '깜빠뉴'; });
 state.items.forEach(function(i){ if (!i.mode) { i.mode = 'manual'; if (i.name === '깜빠뉴') { i.mode = 'cycle'; i.limit = 10; } } });
@@ -279,21 +312,130 @@ function isNeed(i){ return !!i.need || !!autoReason(i); }
 function isSuggest(i){ return !i.need && i.mode === 'cycle' && !!autoReason(i); }
 function isOut(i){ return !!i.need || (i.mode === 'qty' && !!autoReason(i)); }
 
+function parseAmt(t){ var m = String(t || '').match(/^\s*(\d+(?:\.\d+)?)\s*([^\d\s,.][^\d,]*?)?\s*$/); return m ? {n: parseFloat(m[1]), unit: (m[2] || '').trim()} : null; }
+function fmtN(n){ return String(Math.round(n * 100) / 100); }
+function getPick(){ if (!state.pick || state.pick.date !== today()) state.pick = {date: today(), names: []}; return state.pick; }
+function allOpts(){ var o = []; state.menu.forEach(function(sl){ sl.opts.forEach(function(op){ o.push({slot: sl.slot, opt: op}); }); }); return o; }
+function pickedOpts(){ var names = getPick().names; return allOpts().filter(function(x){ return names.indexOf(x.opt.name) >= 0; }); }
+function excludedSlots(){ var ex = {}; pickedOpts().forEach(function(x){ (x.opt.excludes || []).forEach(function(sl){ ex[sl] = x.opt.name; }); }); return ex; }
+function planUses(opts){
+  var agg = {}, order = [];
+  opts.forEach(function(x){ (x.opt.uses || []).forEach(function(u){ var k = u.item + '|' + u.unit; if (!agg[k]) { agg[k] = {item: u.item, unit: u.unit, qty: 0}; order.push(k); } agg[k].qty += u.qty; }); });
+  return order.map(function(k){
+    var u = agg[k], it = byName(u.item), r = {item: u.item, unit: u.unit, qty: u.qty, status: 'ok'};
+    if (!it) { r.status = 'missing'; return r; }
+    var p = parseAmt(it.amt);
+    if (!p) { r.status = 'nonnum'; return r; }
+    if (p.unit && p.unit !== u.unit) { r.status = 'unit'; r.have = p.unit; return r; }
+    r.p = p; if (p.n < u.qty) r.status = 'short';
+    return r;
+  });
+}
+function optState(opt){
+  var st = planUses([{opt: opt}]), out = false, short = false;
+  st.forEach(function(r){ if (r.status === 'short') short = true; var it = byName(r.item); if (it && isOut(it)) out = true; });
+  return out || short;
+}
 function renderPlate(){
   var box = $('plate'); box.textContent = '';
-  PLATE.forEach(function(s){
-    var slot = document.createElement('div'); slot.className = 'slot';
-    var b = document.createElement('b'); b.textContent = s[0];
+  var names = getPick().names, ex = excludedSlots();
+  state.menu.forEach(function(sl){
+    var slot = document.createElement('div'); slot.className = 'slot' + (ex[sl.slot] ? ' off' : '');
+    var b = document.createElement('b'); b.textContent = sl.slot;
     var c = document.createElement('div'); c.className = 'chips';
-    s[1].forEach(function(o){
-      var ch = document.createElement('span'); ch.className = 'chip' + (o[2] || o[1] === 1 ? ' fixed' : '');
-      ch.textContent = o[0];
-      var it = typeof o[1] === 'string' ? byName(o[1]) : null;
-      if (it && isOut(it)) ch.classList.add('out');
-      c.appendChild(ch);
+    if (ex[sl.slot]) { var h = document.createElement('p'); h.className = 'hint'; h.textContent = ex[sl.slot] + '은 ' + sl.slot + ' 없이'; c.appendChild(h); }
+    else sl.opts.forEach(function(op){
+      var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'pk' + (optState(op) ? ' out' : '');
+      bt.textContent = op.name; bt.setAttribute('aria-pressed', names.indexOf(op.name) >= 0 ? 'true' : 'false');
+      bt.addEventListener('click', function(){
+        var pk = getPick(), i = pk.names.indexOf(op.name);
+        if (i >= 0) pk.names.splice(i, 1);
+        else {
+          pk.names.push(op.name);
+          (op.excludes || []).forEach(function(es){ state.menu.forEach(function(s2){ if (s2.slot === es) s2.opts.forEach(function(o2){ var j = pk.names.indexOf(o2.name); if (j >= 0) pk.names.splice(j, 1); }); }); });
+        }
+        save(); renderPicker();
+      });
+      c.appendChild(bt);
     });
     slot.appendChild(b); slot.appendChild(c); box.appendChild(slot);
   });
+}
+function planText(){
+  var picks = pickedOpts(), n = $('pickNote'), pl = $('pickPlan');
+  var ex = excludedSlots(), exn = Object.keys(ex);
+  n.hidden = !exn.length; n.textContent = exn.length ? '부어스트 먹는 날은 계란을 빼고 커리케첩을 곁들인다.' : '';
+  if (!picks.length) { pl.textContent = '메뉴를 고르고 "먹었어요"를 누르면 재고에서 빠져요.'; return; }
+  var plans = planUses(picks), ok = [], no = [];
+  plans.forEach(function(r){
+    if (r.status === 'ok' || r.status === 'short') ok.push(r.item + ' ' + fmtN(r.qty) + r.unit + (r.status === 'short' ? '(부족)' : ''));
+    else no.push(r.item + (r.status === 'unit' ? '(단위 달라요: 재고 ' + r.have + ' / 레시피 ' + r.unit + ')' : r.status === 'nonnum' ? '(남은 양이 숫자가 아니에요)' : '(재고에 없어요)'));
+  });
+  pl.textContent = '차감 예정: ' + (ok.join(' · ') || '없음') + (no.length ? '  |  차감 안 됨: ' + no.join(', ') : '');
+}
+function renderEaten(){
+  var box = $('eaten'); box.textContent = '';
+  var ms = state.meals.filter(function(m){ return m.date === today(); });
+  ms.forEach(function(m, idx){
+    var row = document.createElement('div'); row.className = 'eatrow';
+    var t = document.createElement('span'); t.textContent = '먹음: ' + m.picks.join(' · ');
+    row.appendChild(t);
+    if (idx === ms.length - 1) { var u = document.createElement('button'); u.type = 'button'; u.textContent = '되돌리기'; u.addEventListener('click', undoMeal); row.appendChild(u); }
+    box.appendChild(row);
+  });
+}
+function renderPicker(){ renderPlate(); planText(); renderEaten(); }
+function eat(){
+  var picks = pickedOpts();
+  if (!picks.length) { toast('메뉴를 먼저 골라 주세요'); return; }
+  var plans = planUses(picks), shorts = plans.filter(function(r){ return r.status === 'short'; });
+  if (shorts.length && !confirm('재고가 부족해요: ' + shorts.map(function(r){ return r.item; }).join(', ') + '\n그래도 기록할까요? (부족분은 0으로 둬요)')) return;
+  var used = [];
+  plans.forEach(function(r){
+    if (r.status !== 'ok' && r.status !== 'short') return;
+    var it = byName(r.item), unit = r.p.unit || r.unit, took = Math.min(r.p.n, r.qty);
+    it.amt = fmtN(r.p.n - took) + unit; used.push({item: r.item, qty: took, unit: unit});
+  });
+  state.meals.push({date: today(), picks: picks.map(function(x){ return x.opt.name; }), used: used});
+  state.pick = {date: today(), names: []};
+  save(); renderAll(); toast('기록했어요' + (used.length ? ' · 재고에서 뺐어요' : ''));
+}
+function undoMeal(){
+  var idx = -1; for (var i = state.meals.length - 1; i >= 0; i--) if (state.meals[i].date === today()) { idx = i; break; }
+  if (idx < 0) return;
+  var m = state.meals.splice(idx, 1)[0];
+  m.used.forEach(function(u){
+    var it = byName(u.item); if (!it) return;
+    var p = parseAmt(it.amt);
+    it.amt = p ? fmtN(p.n + u.qty) + (p.unit || u.unit) : fmtN(u.qty) + u.unit;
+  });
+  state.pick = {date: today(), names: m.picks.slice()};
+  save(); renderAll(); toast('되돌렸어요');
+}
+function menuToText(){
+  var lines = [];
+  state.menu.forEach(function(sl){ sl.opts.forEach(function(op){
+    lines.push(sl.slot + ' | ' + op.name + ' | ' + (op.uses || []).map(function(u){ return u.item + ' ' + fmtN(u.qty) + u.unit; }).join(', ') + (op.excludes && op.excludes.length ? ' | 제외:' + op.excludes.join(',') : ''));
+  }); });
+  return lines.join('\n');
+}
+function textToMenu(t){
+  var slots = [], map = {};
+  t.split(/\r?\n/).forEach(function(line){
+    if (!line.trim()) return;
+    var c = line.split('|').map(function(x){ return x.trim(); });
+    if (c.length < 2 || !c[0] || !c[1]) throw new Error('bad line: ' + line);
+    var uses = (c[2] || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean).map(function(x){
+      var m = x.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*(\S*)$/); if (!m) throw new Error('bad use: ' + x);
+      return {item: m[1].trim(), qty: parseFloat(m[2]), unit: m[3]};
+    });
+    var op = {name: c[1], uses: uses};
+    if (c[3] && /^제외\s*:/.test(c[3])) op.excludes = c[3].replace(/^제외\s*:/, '').split(',').map(function(x){ return x.trim(); }).filter(Boolean);
+    if (!map[c[0]]) { map[c[0]] = {slot: c[0], opts: []}; slots.push(map[c[0]]); }
+    map[c[0]].opts.push(op);
+  });
+  if (!slots.length) throw new Error('empty');
+  return slots;
 }
 
 function renderShop(){
@@ -405,7 +547,8 @@ function importFeed(text){
   state.feed.syncedAt = today(); save(); renderAll(); toast(ks.length + '일치를 가져왔어요');
 }
 
-function renderAll(){ renderPlate(); renderShop(); renderList(); renderFeed(); }
+function renderPicker2(){ renderPicker(); }
+function renderAll(){ renderPicker(); renderShop(); renderList(); renderFeed(); $('rcText').value = menuToText(); }
 
 $('buyOk').addEventListener('click', function(){
     state.log.push({date: today(), name: buying.name});
@@ -416,6 +559,9 @@ $('buySnooze').addEventListener('click', function(){
   buying.snooze = addDays(3); $('buyDlg').close(); save(); renderAll(); toast(buying.name + ' 3일 뒤에 다시 제안할게요');
 });
 $('buyCancel').addEventListener('click', function(){ $('buyDlg').close(); });
+$('eatBtn').addEventListener('click', eat);
+$('rcSave').addEventListener('click', function(){ try { state.menu = textToMenu($('rcText').value); state.pick = {date: today(), names: []}; save(); renderAll(); toast('레시피를 저장했어요'); } catch(e){ toast('형식을 확인해 주세요: 칸 | 메뉴 | 재료 수량단위'); } });
+$('rcReset').addEventListener('click', function(){ if (!confirm('레시피를 기본값으로 되돌릴까요?')) return; state.menu = JSON.parse(JSON.stringify(DEFAULT_MENU)); state.pick = {date: today(), names: []}; save(); renderAll(); });
 $('feedGo').addEventListener('click', function(){ importFeed($('feedText').value); if ($('feedText').value.trim()) $('feedText').value = ''; });
 $('feedFile').addEventListener('click', function(){ $('feedIn').click(); });
 $('feedIn').addEventListener('change', function(){ var f = this.files[0]; this.value = ''; if (!f) return; var r = new FileReader(); r.onload = function(){ importFeed(r.result); }; r.readAsText(f); });
@@ -443,7 +589,7 @@ $('importIn').addEventListener('change', function(){
       var d = JSON.parse(r.result);
       if (!d || !Array.isArray(d.items)) throw new Error('bad');
       if (!confirm('현재 기록을 백업 내용으로 바꿀까요?')) return;
-      state = d; state.log = state.log || []; state.feed = state.feed || {syncedAt: null, days: {}}; migrate(); save(); renderAll(); toast('불러왔어요');
+      state = d; state.log = state.log || []; state.feed = state.feed || {syncedAt: null, days: {}}; migrate();  save(); renderAll(); toast('불러왔어요');
     } catch(e){ toast('올바른 백업 파일이 아니에요'); }
   };
   r.readAsText(f);
