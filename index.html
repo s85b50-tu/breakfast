@@ -168,7 +168,8 @@ textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid v
 <h3>빵 (깜빠뉴)</h3>
 <ul><li>통으로 두고 먹을 때마다 그날 필요한 만큼만 썬다.</li><li>버터나 엑스트라버진 올리브유를 발라 굽는다.</li></ul>
 <h3>베이컨 (Hoffy)</h3>
-<ul><li>한 번 먹을 만큼 나눠서 냉동한다.</li><li>여러 곳을 주문해 본 끝에 Hoffy로 정했다. 앞으로 계속 주문한다. 국내 잡육 베이컨은 만족도가 떨어졌다.</li><li>소비량: 해외산 하루 2장, 국산은 삼겹살이라도 하루 3~4장.</li></ul>
+<ul><li>한 번 먹을 만큼 나눠서 냉동한다.</li><li>여러 곳을 주문해 본 끝에 Hoffy로 정했다. 앞으로 계속 주문한다. 국내 잡육 베이컨은 만족도가 떨어졌다.</li><li>소비량: Hoffy 하루 2장. 국산은 삼겹살이라도 하루 3~4장이었다.</li>
+<li>배송: 저녁에 주문하면 다음 날 아침에 도착한다.</li></ul>
 <h3>연어 · 닭 통다리 · 부어스트</h3>
 <ul><li>냉동해두고, 먹기 전날 밤 냉장실로 옮겨 해동한다.</li></ul>
 <h3>절임류 (자우어크라우트, 카스텔베트라노 올리브)</h3>
@@ -178,7 +179,7 @@ textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid v
 <ul>
   <li>절임류 · 커리케첩 · 버터 · 올리브유: 절반 남으면</li>
   <li>빵(깜빠뉴): 남은 양을 보고 직접 체크</li>
-  <li>베이컨: 4장 이하(해외산 기준 이틀치)면. 앱에서 자동으로 올라옵니다.</li>
+  <li>베이컨: 2장 이하(하루치 여유)면 저녁에 주문. 앱에서 자동으로 올라옵니다.</li>
   <li>그 외 고기류: 종류별 소분 1~2팩 남으면</li>
 </ul>
 
@@ -252,7 +253,7 @@ var DEFAULT_MENU = [
 ];
 var SEED = {log:[], meals:[], menu:null, feed:{syncedAt:null, days:{}}, items:[
   {id:'i1',name:'깜빠뉴',where:'통으로 보관, 그날 썰기',amt:'0',need:true,mode:'cycle',limit:10},
-  {id:'i2',name:'베이컨',where:'냉동',amt:'0장',need:false,mode:'qty',limit:4},
+  {id:'i2',name:'베이컨',where:'냉동',amt:'0장',need:false,mode:'qty',limit:2},
   {id:'i3',name:'닭 통다리',where:'냉동',amt:'0',need:true},
   {id:'i4',name:'연어',where:'냉동',amt:'0',need:true},
   {id:'i5',name:'부어스트',where:'냉동',amt:'0',need:true},
@@ -280,6 +281,7 @@ state.items.forEach(function(i){ if (i.id === 'i1' && i.name === '통밀빵 / �
 state.log.forEach(function(e){ if (e.name === '통밀빵 / 호밀빵') e.name = '깜빠뉴'; });
 state.items.forEach(function(i){ if (!i.mode) { i.mode = 'manual'; if (i.name === '깜빠뉴') { i.mode = 'cycle'; i.limit = 10; } } });
 state.mig = state.mig || {};
+if (!state.mig.bacon2) { state.mig.bacon2 = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && i.mode === 'qty' && i.limit === 4) i.limit = 2; }); }
 if (!state.mig.bacon) { state.mig.bacon = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && i.mode === 'manual' && i.limit == null) { i.mode = 'qty'; i.limit = 4; } }); }
 }
 migrate();
