@@ -1,4 +1,4 @@
-const CACHE = 'breakfast-v15';
+const CACHE = 'breakfast-' + (new URL(self.location.href).searchParams.get('v') || '0');
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
@@ -10,6 +10,7 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  if (e.request.url.indexOf('version.json') >= 0) return;
   e.respondWith(
     fetch(e.request).then(r => {
       const copy = r.clone();

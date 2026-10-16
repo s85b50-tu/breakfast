@@ -20,6 +20,7 @@
     --olive:#A6BD6B; --olive-soft:#343C26; --mustard:#E2B44A; --mustard-soft:#3F3520; --line:#3C4035;}
 }
 *{box-sizing:border-box}
+[hidden]{display:none !important}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;
   padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 main{max-width:560px;margin:0 auto;padding:20px 16px 96px}
@@ -88,6 +89,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .tabbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tabbar button[aria-current="page"]{color:var(--olive);font-weight:700}
 .tabbar button[aria-current="page"] svg{stroke-width:2.1}
+.ver{font-size:.75rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 8px}
+.upd{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--mustard-soft);border-radius:10px;padding:10px 12px;margin:0 0 14px;font-size:.92rem}
+.vlog h3{margin:12px 0 2px}
+.vlog ul{margin:2px 0 8px}
 .pk{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--olive-soft);color:var(--ink);border-radius:999px;padding:7px 13px;min-height:40px}
 .pk[aria-pressed="true"]{background:var(--olive);border-color:var(--olive);color:#fff;font-weight:700}
 .pk.out{opacity:.45;text-decoration:line-through}
@@ -107,7 +112,8 @@ textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid v
 <body>
 <main>
 <h1>아침식사 루틴</h1>
-<p class="lede">독일식 아침. 다섯 칸을 그날 기분대로 채운다.</p>
+<p class="lede">독일식 아침. 다섯 칸을 그날 기분대로 채운다. <span class="ver" id="verTag"></span></p>
+<div class="alert upd" id="updBar" hidden><span id="updMsg"></span> <button class="btn" id="updGo" type="button">업데이트</button></div>
 
 <section class="tab" id="tab-today">
 <h2>오늘의 아침식사</h2>
@@ -201,6 +207,14 @@ textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid v
   </div>
 </div>
 
+<h2>버전</h2>
+<div class="card">
+  <p><b id="verNow"></b> <span class="hint" id="verMsg"></span></p>
+  <div class="row"><button class="btn ghost" id="verCheck" type="button">업데이트 확인</button></div>
+  <p class="hint">기록은 그대로 두고 앱 파일만 최신으로 바꿔요.</p>
+  <div id="verLog"></div>
+</div>
+
 <h2>백업</h2>
 <div class="card">
   <p class="hint">기록은 이 폰의 브라우저에만 저장됩니다. 브라우저 데이터를 지우면 사라지니, 가끔 백업하세요.</p>
@@ -272,6 +286,8 @@ var SEED = {log:[], meals:[], menu:null, feed:{syncedAt:null, days:{}}, items:[
   {id:'i15',name:'콜라',where:'',amt:'0',need:true},
   {id:'i16',name:'탄산수',where:'',amt:'2박스',need:false}
 ]};
+var APP_VERSION = '0.7.0';
+var CHANGELOG = [{"v": "0.7.0", "d": "2026-10-16", "c": ["버전 기록과 '업데이트 확인' 추가. 새 버전이 있으면 앱을 열 때 알려줘요."]}, {"v": "0.6.0", "d": "2026-10-16", "c": ["베이컨을 Hoffy로 확정, 재주문 기준 2장 이하(저녁 주문 시 다음 날 아침 도착).", "팩 단위 구매: 1팩 8장, 기본 2팩. '샀음'에서 팩 수만 입력하면 남은 양에 더해져요.", "품목 보관(숨김) 기능 추가(선택 기능)."]}, {"v": "0.5.0", "d": "2026-10-14", "c": ["오늘의 아침식사: 메뉴를 고르고 '오늘의 아침식사 저장'을 누르면 레시피대로 재고가 차감돼요.", "저장 되돌리기, 레시피 편집 화면 추가."]}, {"v": "0.4.0", "d": "2026-10-13", "c": ["가격 입력과 월 예산 삭제. 금액은 컨디션 앱 기준.", "컨디션 앱의 아침 식비 데이터를 붙여넣기나 파일로 받는 식비 탭. 7일이 지나면 가져오라고 알려줘요."]}, {"v": "0.3.0", "d": "2026-10-11", "c": ["하단 탭 4개(오늘, 재고, 식비, 정보).", "깜빠뉴와 베이컨 정보 정리.", "재주문 방식 3가지: 수동, 수량, 주기. 주기는 제안으로 표시하고 3일 미루기 가능."]}, {"v": "0.2.0", "d": "2026-10-10", "c": ["앱 아이콘을 접시와 포크, 나이프로 교체."]}, {"v": "0.1.0", "d": "2026-10-09", "c": ["첫 버전: 한 접시 구성, 재고, 구매 기록, 월 식비, 백업, 설치형 앱."]}];
 var $ = function(id){ return document.getElementById(id); };
 var state;
 try { state = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch(e){}
@@ -641,7 +657,27 @@ function showTab(name){
 document.querySelectorAll('#tabbar button').forEach(function(b){ b.addEventListener('click', function(){ showTab(b.dataset.tab); }); });
 var startTab = 'today'; try { startTab = localStorage.getItem('breakfast-tab') || 'today'; } catch(e){}
 renderAll(); save(); showTab(startTab);
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
+function refreshApp(){
+  var jobs = [];
+  if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){ return Promise.all(rs.map(function(r){ return r.unregister(); })); }));
+  if (window.caches) jobs.push(caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); }));
+  Promise.all(jobs).catch(function(){}).then(function(){ location.reload(); });
+}
+function checkUpdate(manual){
+  return fetch('version.json?t=' + Date.now(), {cache: 'no-store'}).then(function(r){ return r.json(); }).then(function(d){
+    if (d.version !== APP_VERSION) {
+      $('updMsg').textContent = '새 버전 v' + d.version + '이 있어요 (지금 v' + APP_VERSION + ')'; $('updBar').hidden = false;
+      $('verMsg').textContent = '새 버전 v' + d.version + ' 있음';
+      if (manual) refreshApp();
+    } else { $('updBar').hidden = true; $('verMsg').textContent = '최신 버전이에요'; if (manual) toast('최신 버전이에요'); }
+  }).catch(function(){ if (manual) toast('인터넷에 연결돼 있어야 확인할 수 있어요'); });
+}
+$('verTag').textContent = 'v' + APP_VERSION; $('verNow').textContent = '현재 v' + APP_VERSION;
+(function(){ var box = $('verLog'); box.className = 'vlog'; CHANGELOG.forEach(function(c){ var h = document.createElement('h3'); h.textContent = 'v' + c.v + ' · ' + c.d; box.appendChild(h); var ul = document.createElement('ul'); c.c.forEach(function(t){ var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); }); box.appendChild(ul); }); })();
+$('verCheck').addEventListener('click', function(){ checkUpdate(true); });
+$('updGo').addEventListener('click', refreshApp);
+checkUpdate(false);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=' + APP_VERSION).catch(function(){});
 })();
 </script>
 </body>
