@@ -181,7 +181,7 @@ textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid v
   <li>절임류 · 커리케첩 · 버터 · 올리브유: 절반 남으면</li>
   <li>빵(깜빠뉴): 남은 양을 보고 직접 체크</li>
   <li>베이컨: 2장 이하(하루치 여유)면 저녁에 주문. 앱에서 자동으로 올라옵니다.</li>
-  <li>연어·닭 통다리·부어스트: 지금은 보관 중(약 3개월 뒤 재개 예정). 레시피 화면에서 <code>#</code>을 지우면 다시 나타나요.</li>
+  <li>연어·닭 통다리·부어스트: 지금은 거의 안 먹어서 기능 개선은 후순위(약 3개월 뒤). 메뉴와 재고는 그대로 둠.</li>
 </ul>
 
 <h2>비용 원칙</h2>
@@ -285,9 +285,10 @@ state.items.forEach(function(i){ if (i.id === 'i1' && i.name === '통밀빵 / �
 state.log.forEach(function(e){ if (e.name === '통밀빵 / 호밀빵') e.name = '깜빠뉴'; });
 state.items.forEach(function(i){ if (!i.mode) { i.mode = 'manual'; if (i.name === '깜빠뉴') { i.mode = 'cycle'; i.limit = 10; } } });
 state.mig = state.mig || {};
-if (!state.mig.arch1) { state.mig.arch1 = 1;
-  state.items.forEach(function(i){ if (['연어', '닭 통다리', '부어스트'].indexOf(i.name) >= 0) { i.archived = true; i.need = false; } });
-  state.menu.forEach(function(sl){ sl.opts.forEach(function(o){ if (['닭 통다리구이', '연어스테이크', '부어스트'].indexOf(o.name) >= 0) o.archived = true; }); });
+state.mig.arch1 = 1;
+if (!state.mig.unarch1) { state.mig.unarch1 = 1;
+  state.items.forEach(function(i){ if (['연어', '닭 통다리', '부어스트'].indexOf(i.name) >= 0) i.archived = false; });
+  state.menu.forEach(function(sl){ sl.opts.forEach(function(o){ if (['닭 통다리구이', '연어스테이크', '부어스트'].indexOf(o.name) >= 0) o.archived = false; }); });
 }
 if (!state.mig.bacon3) { state.mig.bacon3 = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && !i.pack) i.pack = {size: 8, unit: '장', packs: 2}; }); }
 if (!state.mig.bacon2) { state.mig.bacon2 = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && i.mode === 'qty' && i.limit === 4) i.limit = 2; }); }
