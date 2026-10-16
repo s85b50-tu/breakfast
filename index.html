@@ -221,6 +221,9 @@ textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid v
 
 <dialog id="buyDlg">
   <p><b id="buyName"></b> 샀음</p>
+  <div id="buyPackBox" hidden style="margin-top:10px"><label class="hint" for="buyPacks">구매한 팩 수</label>
+  <input id="buyPacks" type="number" inputmode="decimal" min="1" step="1">
+  <p class="hint" id="buyPackHint" style="margin:4px 0 0"></p></div>
   <div id="buyAmtBox" hidden style="margin-top:10px"><label class="hint" for="buyAmt">지금 남은 양 (갱신)</label>
   <input id="buyAmt" type="text" placeholder="예: 6장"></div>
   <div class="row" style="margin-top:12px">
@@ -253,7 +256,7 @@ var DEFAULT_MENU = [
 ];
 var SEED = {log:[], meals:[], menu:null, feed:{syncedAt:null, days:{}}, items:[
   {id:'i1',name:'깜빠뉴',where:'통으로 보관, 그날 썰기',amt:'0',need:true,mode:'cycle',limit:10},
-  {id:'i2',name:'베이컨',where:'냉동',amt:'0장',need:false,mode:'qty',limit:2},
+  {id:'i2',name:'베이컨',where:'냉동',amt:'0장',need:false,mode:'qty',limit:2,pack:{size:8,unit:'장',packs:2}},
   {id:'i3',name:'닭 통다리',where:'냉동',amt:'0',need:true},
   {id:'i4',name:'연어',where:'냉동',amt:'0',need:true},
   {id:'i5',name:'부어스트',where:'냉동',amt:'0',need:true},
@@ -281,6 +284,7 @@ state.items.forEach(function(i){ if (i.id === 'i1' && i.name === '통밀빵 / �
 state.log.forEach(function(e){ if (e.name === '통밀빵 / 호밀빵') e.name = '깜빠뉴'; });
 state.items.forEach(function(i){ if (!i.mode) { i.mode = 'manual'; if (i.name === '깜빠뉴') { i.mode = 'cycle'; i.limit = 10; } } });
 state.mig = state.mig || {};
+if (!state.mig.bacon3) { state.mig.bacon3 = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && !i.pack) i.pack = {size: 8, unit: '장', packs: 2}; }); }
 if (!state.mig.bacon2) { state.mig.bacon2 = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && i.mode === 'qty' && i.limit === 4) i.limit = 2; }); }
 if (!state.mig.bacon) { state.mig.bacon = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && i.mode === 'manual' && i.limit == null) { i.mode = 'qty'; i.limit = 4; } }); }
 }
@@ -295,6 +299,7 @@ function toast(m){ var t = $('toast'); t.textContent = m; t.classList.add('show'
 function byName(n){ return state.items.filter(function(i){ return i.name === n; })[0]; }
 function lastBuy(name){ for (var i = state.log.length - 1; i >= 0; i--) if (state.log[i].name === name) return state.log[i]; return null; }
 function daysAgo(d){ return Math.round((new Date(today()) - new Date(d)) / 86400000); }
+function packResult(item, n){ var p = parseAmt(item.amt), base = p ? p.n : 0, unit = (p && p.unit) || item.pack.unit || ''; return fmtN(base + n * item.pack.size) + unit; }
 function numOf(t){ var m = String(t || '').match(/\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; }
 function addDays(n){ var d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function autoReason(i){
@@ -452,7 +457,9 @@ function renderShop(){
     if (lab) { var s = document.createElement('small'); s.textContent = lab; b.appendChild(s); }
     b.addEventListener('click', function(){
       buying = item; $('buyName').textContent = item.name;
-      $('buyAmtBox').hidden = item.mode !== 'qty'; $('buyAmt').value = item.amt || '';
+      var usePack = item.mode === 'qty' && item.pack && item.pack.size > 0;
+      $('buyPackBox').hidden = !usePack; $('buyAmtBox').hidden = item.mode !== 'qty' || usePack; $('buyAmt').value = item.amt || '';
+      if (usePack) { $('buyPacks').value = item.pack.packs || 1; packHint(); }
       $('buySnooze').hidden = !isSuggest(item);
       $('buyDlg').showModal();
     });
@@ -487,10 +494,18 @@ function renderList(){
     [['manual','수동'],['qty','수량'],['cycle','주기']].forEach(function(o){ var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; if (item.mode === o[0]) op.selected = true; sel.appendChild(op); });
     var lim = document.createElement('input'); lim.type = 'number'; lim.inputMode = 'decimal'; lim.min = '0'; lim.value = item.limit == null ? '' : item.limit; lim.setAttribute('aria-label', item.name + ' 기준값');
     var unit = document.createElement('span');
-    function cfgUi(){ lim.hidden = item.mode === 'manual'; unit.textContent = item.mode === 'cycle' ? '일 지나면 추가구매 제안' : item.mode === 'qty' ? '이하면 재주문' : '직접 체크'; }
+    function cfgUi(){ lim.hidden = item.mode === 'manual'; if (typeof packRow !== 'undefined') packRow.hidden = item.mode !== 'qty'; unit.textContent = item.mode === 'cycle' ? '일 지나면 추가구매 제안' : item.mode === 'qty' ? '이하면 재주문' : '직접 체크'; }
     sel.addEventListener('change', function(){ item.mode = sel.value; cfgUi(); save(); renderAll(); });
     lim.addEventListener('change', function(){ var v = parseFloat(lim.value); item.limit = isNaN(v) ? null : v; save(); renderAll(); });
-    cfgUi(); cfg.appendChild(document.createTextNode('방식')); cfg.appendChild(sel); cfg.appendChild(lim); cfg.appendChild(unit);
+    var packRow = document.createElement('span'); packRow.style.cssText = 'display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap';
+    var pk = item.pack || {}, pSize = document.createElement('input'), pUnit = document.createElement('input'), pCnt = document.createElement('input');
+    pSize.type = 'number'; pSize.min = '0'; pSize.value = pk.size || ''; pSize.setAttribute('aria-label', item.name + ' 1팩 수량');
+    pUnit.type = 'text'; pUnit.value = pk.unit || ''; pUnit.style.width = '3.5em'; pUnit.setAttribute('aria-label', item.name + ' 단위');
+    pCnt.type = 'number'; pCnt.min = '1'; pCnt.value = pk.packs || ''; pCnt.setAttribute('aria-label', item.name + ' 주문 팩 수');
+    function pSave(){ var sz = parseFloat(pSize.value); item.pack = sz > 0 ? {size: sz, unit: pUnit.value.trim(), packs: parseFloat(pCnt.value) || 1} : null; save(); }
+    [pSize, pUnit, pCnt].forEach(function(e){ e.addEventListener('change', pSave); });
+    packRow.appendChild(document.createTextNode('1팩')); packRow.appendChild(pSize); packRow.appendChild(pUnit); packRow.appendChild(document.createTextNode('주문')); packRow.appendChild(pCnt); packRow.appendChild(document.createTextNode('팩'));
+    cfgUi(); cfg.appendChild(document.createTextNode('방식')); cfg.appendChild(sel); cfg.appendChild(lim); cfg.appendChild(unit); cfg.appendChild(packRow);
     row.appendChild(name); row.appendChild(amt); row.appendChild(lab); row.appendChild(cfg); list.appendChild(row);
   });
 }
@@ -554,9 +569,12 @@ function renderAll(){ renderPicker(); renderShop(); renderList(); renderFeed(); 
 
 $('buyOk').addEventListener('click', function(){
     state.log.push({date: today(), name: buying.name});
-  if (buying.mode === 'qty') buying.amt = $('buyAmt').value.trim();
+  if (buying.mode === 'qty' && buying.pack && buying.pack.size > 0) { var np = parseFloat($('buyPacks').value); if (!(np > 0)) { toast('팩 수를 입력해 주세요'); return; } buying.amt = packResult(buying, np); }
+  else if (buying.mode === 'qty') buying.amt = $('buyAmt').value.trim();
   buying.need = false; buying.snooze = null; $('buyDlg').close(); save(); renderAll(); toast(buying.name + ' 기록했어요');
 });
+function packHint(){ var np = parseFloat($('buyPacks').value); $('buyPackHint').textContent = np > 0 && buying ? '지금 ' + (buying.amt || '0') + ' → ' + packResult(buying, np) + ' (1팩 ' + fmtN(buying.pack.size) + (buying.pack.unit || '') + ')' : ''; }
+$('buyPacks').addEventListener('input', packHint);
 $('buySnooze').addEventListener('click', function(){
   buying.snooze = addDays(3); $('buyDlg').close(); save(); renderAll(); toast(buying.name + ' 3일 뒤에 다시 제안할게요');
 });
