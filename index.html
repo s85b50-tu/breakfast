@@ -58,6 +58,7 @@ input[type=text],input[type=number]{width:100%;font:inherit;font-size:.95rem;pad
 .buy.sug{background:transparent;border-style:dashed}
 .buy.sug::before{content:'제안 ';font-size:.76rem;color:var(--mustard);font-weight:700}
 .item.sug{border-color:var(--line);box-shadow:inset 4px 0 0 var(--mustard);border-style:dashed}
+.item.arch{opacity:.55;border-style:dashed}
 .why{display:block;font-size:.76rem;font-weight:600;color:var(--mustard)}
 .cfg{display:none;grid-column:1/-1;align-items:center;gap:6px;flex-wrap:wrap;font-size:.84rem;color:var(--muted)}
 .editing .cfg{display:flex}
@@ -180,7 +181,7 @@ textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid v
   <li>절임류 · 커리케첩 · 버터 · 올리브유: 절반 남으면</li>
   <li>빵(깜빠뉴): 남은 양을 보고 직접 체크</li>
   <li>베이컨: 2장 이하(하루치 여유)면 저녁에 주문. 앱에서 자동으로 올라옵니다.</li>
-  <li>그 외 고기류: 종류별 소분 1~2팩 남으면</li>
+  <li>연어·닭 통다리·부어스트: 지금은 보관 중(약 3개월 뒤 재개 예정). 레시피 화면에서 <code>#</code>을 지우면 다시 나타나요.</li>
 </ul>
 
 <h2>비용 원칙</h2>
@@ -192,7 +193,7 @@ textarea{width:100%;font:inherit;font-size:.85rem;padding:9px;border:1px solid v
 
 <h2>레시피</h2>
 <div class="card">
-  <p class="hint">한 줄에 하나: <code>칸 | 메뉴 | 재료 수량단위, 재료 수량단위 | 제외:칸</code>. 재료는 재고 품목 이름과 같아야 하고, 단위는 재고의 남은 양 단위(예: 8장)와 같아야 차감돼요.</p>
+  <p class="hint">한 줄에 하나: <code>칸 | 메뉴 | 재료 수량단위, 재료 수량단위 | 제외:칸</code>. 줄 맨 앞에 <code>#</code>을 붙이면 보관(숨김), 지우면 다시 나타나요. 재료는 재고 품목 이름과 같아야 하고, 단위는 재고의 남은 양 단위(예: 8장)와 같아야 차감돼요.</p>
   <textarea id="rcText" rows="12" spellcheck="false"></textarea>
   <div class="row" style="margin-top:8px">
     <button class="btn" id="rcSave" type="button">레시피 저장</button>
@@ -284,6 +285,10 @@ state.items.forEach(function(i){ if (i.id === 'i1' && i.name === '통밀빵 / �
 state.log.forEach(function(e){ if (e.name === '통밀빵 / 호밀빵') e.name = '깜빠뉴'; });
 state.items.forEach(function(i){ if (!i.mode) { i.mode = 'manual'; if (i.name === '깜빠뉴') { i.mode = 'cycle'; i.limit = 10; } } });
 state.mig = state.mig || {};
+if (!state.mig.arch1) { state.mig.arch1 = 1;
+  state.items.forEach(function(i){ if (['연어', '닭 통다리', '부어스트'].indexOf(i.name) >= 0) { i.archived = true; i.need = false; } });
+  state.menu.forEach(function(sl){ sl.opts.forEach(function(o){ if (['닭 통다리구이', '연어스테이크', '부어스트'].indexOf(o.name) >= 0) o.archived = true; }); });
+}
 if (!state.mig.bacon3) { state.mig.bacon3 = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && !i.pack) i.pack = {size: 8, unit: '장', packs: 2}; }); }
 if (!state.mig.bacon2) { state.mig.bacon2 = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && i.mode === 'qty' && i.limit === 4) i.limit = 2; }); }
 if (!state.mig.bacon) { state.mig.bacon = 1; state.items.forEach(function(i){ if (i.name === '베이컨' && i.mode === 'manual' && i.limit == null) { i.mode = 'qty'; i.limit = 4; } }); }
@@ -303,6 +308,7 @@ function packResult(item, n){ var p = parseAmt(item.amt), base = p ? p.n : 0, un
 function numOf(t){ var m = String(t || '').match(/\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; }
 function addDays(n){ var d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function autoReason(i){
+  if (i.archived) return '';
   if (i.mode === 'cycle' && i.limit > 0) {
     if (i.snooze && today() < i.snooze) return '';
     var lb = lastBuy(i.name); if (!lb) return '';
@@ -315,14 +321,15 @@ function autoReason(i){
   }
   return '';
 }
-function isNeed(i){ return !!i.need || !!autoReason(i); }
+function isNeed(i){ return !i.archived && (!!i.need || !!autoReason(i)); }
 function isSuggest(i){ return !i.need && i.mode === 'cycle' && !!autoReason(i); }
-function isOut(i){ return !!i.need || (i.mode === 'qty' && !!autoReason(i)); }
+function isOut(i){ return !i.archived && (!!i.need) || (i.mode === 'qty' && !!autoReason(i)); }
 
 function parseAmt(t){ var m = String(t || '').match(/^\s*(\d+(?:\.\d+)?)\s*([^\d\s,.][^\d,]*?)?\s*$/); return m ? {n: parseFloat(m[1]), unit: (m[2] || '').trim()} : null; }
 function fmtN(n){ return String(Math.round(n * 100) / 100); }
 function getPick(){ if (!state.pick || state.pick.date !== today()) state.pick = {date: today(), names: []}; return state.pick; }
-function allOpts(){ var o = []; state.menu.forEach(function(sl){ sl.opts.forEach(function(op){ o.push({slot: sl.slot, opt: op}); }); }); return o; }
+function activeOpts(sl){ return sl.opts.filter(function(o){ return !o.archived; }); }
+function allOpts(){ var o = []; state.menu.forEach(function(sl){ activeOpts(sl).forEach(function(op){ o.push({slot: sl.slot, opt: op}); }); }); return o; }
 function pickedOpts(){ var names = getPick().names; return allOpts().filter(function(x){ return names.indexOf(x.opt.name) >= 0; }); }
 function excludedSlots(){ var ex = {}; pickedOpts().forEach(function(x){ (x.opt.excludes || []).forEach(function(sl){ ex[sl] = x.opt.name; }); }); return ex; }
 function planUses(opts){
@@ -347,11 +354,12 @@ function renderPlate(){
   var box = $('plate'); box.textContent = '';
   var names = getPick().names, ex = excludedSlots();
   state.menu.forEach(function(sl){
+    if (!activeOpts(sl).length) return;
     var slot = document.createElement('div'); slot.className = 'slot' + (ex[sl.slot] ? ' off' : '');
     var b = document.createElement('b'); b.textContent = sl.slot;
     var c = document.createElement('div'); c.className = 'chips';
     if (ex[sl.slot]) { var h = document.createElement('p'); h.className = 'hint'; h.textContent = ex[sl.slot] + '은 ' + sl.slot + ' 없이'; c.appendChild(h); }
-    else sl.opts.forEach(function(op){
+    else activeOpts(sl).forEach(function(op){
       var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'pk' + (optState(op) ? ' out' : '');
       bt.textContent = op.name; bt.setAttribute('aria-pressed', names.indexOf(op.name) >= 0 ? 'true' : 'false');
       bt.addEventListener('click', function(){
@@ -359,7 +367,7 @@ function renderPlate(){
         if (i >= 0) pk.names.splice(i, 1);
         else {
           pk.names.push(op.name);
-          (op.excludes || []).forEach(function(es){ state.menu.forEach(function(s2){ if (s2.slot === es) s2.opts.forEach(function(o2){ var j = pk.names.indexOf(o2.name); if (j >= 0) pk.names.splice(j, 1); }); }); });
+          (op.excludes || []).forEach(function(es){ state.menu.forEach(function(s2){ if (s2.slot === es) activeOpts(s2).forEach(function(o2){ var j = pk.names.indexOf(o2.name); if (j >= 0) pk.names.splice(j, 1); }); }); });
         }
         save(); renderPicker();
       });
@@ -422,7 +430,7 @@ function undoMeal(){
 function menuToText(){
   var lines = [];
   state.menu.forEach(function(sl){ sl.opts.forEach(function(op){
-    lines.push(sl.slot + ' | ' + op.name + ' | ' + (op.uses || []).map(function(u){ return u.item + ' ' + fmtN(u.qty) + u.unit; }).join(', ') + (op.excludes && op.excludes.length ? ' | 제외:' + op.excludes.join(',') : ''));
+    lines.push((op.archived ? '# ' : '') + sl.slot + ' | ' + op.name + ' | ' + (op.uses || []).map(function(u){ return u.item + ' ' + fmtN(u.qty) + u.unit; }).join(', ') + (op.excludes && op.excludes.length ? ' | 제외:' + op.excludes.join(',') : ''));
   }); });
   return lines.join('\n');
 }
@@ -430,13 +438,14 @@ function textToMenu(t){
   var slots = [], map = {};
   t.split(/\r?\n/).forEach(function(line){
     if (!line.trim()) return;
+    var arch = /^\s*#/.test(line); if (arch) line = line.replace(/^\s*#\s*/, '');
     var c = line.split('|').map(function(x){ return x.trim(); });
     if (c.length < 2 || !c[0] || !c[1]) throw new Error('bad line: ' + line);
     var uses = (c[2] || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean).map(function(x){
       var m = x.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*(\S*)$/); if (!m) throw new Error('bad use: ' + x);
       return {item: m[1].trim(), qty: parseFloat(m[2]), unit: m[3]};
     });
-    var op = {name: c[1], uses: uses};
+    var op = {name: c[1], uses: uses}; if (arch) op.archived = true;
     if (c[3] && /^제외\s*:/.test(c[3])) op.excludes = c[3].replace(/^제외\s*:/, '').split(',').map(function(x){ return x.trim(); }).filter(Boolean);
     if (!map[c[0]]) { map[c[0]] = {slot: c[0], opts: []}; slots.push(map[c[0]]); }
     map[c[0]].opts.push(op);
@@ -470,7 +479,8 @@ function renderShop(){
 function renderList(){
   var list = $('list'); list.textContent = '';
   state.items.forEach(function(item){
-    var row = document.createElement('div'); row.className = 'item' + (isSuggest(item) ? ' sug' : isNeed(item) ? ' need' : '');
+    if (item.archived && !editing) return;
+    var row = document.createElement('div'); row.className = 'item' + (item.archived ? ' arch' : '') + (isSuggest(item) ? ' sug' : isNeed(item) ? ' need' : '');
     var name = document.createElement('div'); name.className = 'name'; name.textContent = item.name;
     if (item.where) { var w = document.createElement('span'); w.className = 'where'; w.textContent = item.where; name.appendChild(w); }
     var lb = lastBuy(item.name);
@@ -505,7 +515,11 @@ function renderList(){
     function pSave(){ var sz = parseFloat(pSize.value); item.pack = sz > 0 ? {size: sz, unit: pUnit.value.trim(), packs: parseFloat(pCnt.value) || 1} : null; save(); }
     [pSize, pUnit, pCnt].forEach(function(e){ e.addEventListener('change', pSave); });
     packRow.appendChild(document.createTextNode('1팩')); packRow.appendChild(pSize); packRow.appendChild(pUnit); packRow.appendChild(document.createTextNode('주문')); packRow.appendChild(pCnt); packRow.appendChild(document.createTextNode('팩'));
-    cfgUi(); cfg.appendChild(document.createTextNode('방식')); cfg.appendChild(sel); cfg.appendChild(lim); cfg.appendChild(unit); cfg.appendChild(packRow);
+    var arc = document.createElement('label'); arc.style.cssText = 'display:inline-flex;align-items:center;gap:4px;margin-left:auto';
+    var arcCb = document.createElement('input'); arcCb.type = 'checkbox'; arcCb.checked = !!item.archived; arcCb.style.width = 'auto';
+    arcCb.addEventListener('change', function(){ item.archived = arcCb.checked; if (item.archived) item.need = false; save(); renderAll(); });
+    arc.appendChild(arcCb); arc.appendChild(document.createTextNode('보관(숨김)'));
+    cfgUi(); cfg.appendChild(arc); cfg.appendChild(document.createTextNode('방식')); cfg.appendChild(sel); cfg.appendChild(lim); cfg.appendChild(unit); cfg.appendChild(packRow);
     row.appendChild(name); row.appendChild(amt); row.appendChild(lab); row.appendChild(cfg); list.appendChild(row);
   });
 }
@@ -586,7 +600,7 @@ $('feedGo').addEventListener('click', function(){ importFeed($('feedText').value
 $('feedFile').addEventListener('click', function(){ $('feedIn').click(); });
 $('feedIn').addEventListener('change', function(){ var f = this.files[0]; this.value = ''; if (!f) return; var r = new FileReader(); r.onload = function(){ importFeed(r.result); }; r.readAsText(f); });
 $('editBtn').addEventListener('click', function(){
-  editing = !editing; $('tracker').classList.toggle('editing', editing);
+  editing = !editing; $('tracker').classList.toggle('editing', editing); renderList();
   $('editBtn').textContent = editing ? '편집 끝' : '품목 편집';
 });
 $('addBtn').addEventListener('click', function(){
